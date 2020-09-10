@@ -69,7 +69,7 @@ func handleConsentGet(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 		return
 	}
 
-	if consentRequest.GetPayload().Client.ClientID == "ppro-frontend" {
+	if consentRequest.GetPayload().Client.ClientID == "client-frontend.localhost" {
 		acceptInternalClients(w, r, admin, consentRequest)
 		return
 	}
@@ -143,7 +143,7 @@ func acceptSkippedConsent(w http.ResponseWriter, r *http.Request, admin *hydra.O
 			Body: &models.AcceptConsentRequest{
 				GrantAccessTokenAudience: consentRequest.Payload.RequestedAccessTokenAudience, // todo investigate if we can open to all audiences
 				GrantScope:               consentRequest.Payload.RequestedScope,               // todo investigate how to fill this
-				Session:                  nil,                                                 // todo investigate how to fill this
+				Session: getConsentRequestSession(consentRequest),                                                                             // todo investigate how to fill this
 			},
 			ConsentChallenge: *consentRequest.Payload.Challenge,
 			Context:          DefaultContext,
@@ -169,7 +169,7 @@ func acceptInternalClients(
 				GrantAccessTokenAudience: consentRequest.Payload.RequestedAccessTokenAudience, // todo investigate if we can open to all audiences
 				GrantScope:               []string{"openid", "offline"},                       // todo investigate how to fill this
 				Remember:                 true,
-				Session:                  nil, // todo investigate how to fill this
+				Session: getConsentRequestSession(consentRequest),
 			},
 			ConsentChallenge: *consentRequest.Payload.Challenge,
 			Context:          DefaultContext,
@@ -198,7 +198,7 @@ func acceptExplicitConsent(
 				GrantAccessTokenAudience: consentRequest.Payload.RequestedAccessTokenAudience, // todo investigate if we can open to all audiences
 				GrantScope:               scopes,                                              // todo investigate how to fill this
 				Remember:                 remember,
-				Session:                  nil, // todo investigate how to fill this
+				Session: getConsentRequestSession(consentRequest),
 			},
 			ConsentChallenge: *consentRequest.Payload.Challenge,
 			Context:          DefaultContext,
@@ -211,4 +211,57 @@ func acceptExplicitConsent(
 
 	http.Redirect(w, r, *accept.GetPayload().RedirectTo, 301) // todo check code
 	return
+}
+
+func getConsentRequestSession(consentRequest *admin2.GetConsentRequestOK) *models.ConsentRequestSession {
+	return &models.ConsentRequestSession{
+		IDToken:     getIDTokenFromSubject(consentRequest.Payload.Subject),
+		AccessToken: getAccessTokenFromSubject(consentRequest.Payload.Subject),
+	}
+}
+
+func getIDTokenFromSubject(subject string) IDToken {
+	//todo findUserFromEmail
+	return IDToken{
+		Name:  "Foo Bar",
+		Email: subject,
+	}
+}
+
+func getAccessTokenFromSubject(subject string) AccessToken {
+	//todo findUserFromEmail
+	return AccessToken{
+		Mercure:  Mercure{
+			Subscribe: []string{"users/8f068dce-c664-11e8-a21b-02286126d5c8"},
+		},
+		User: User{
+			Email: subject,
+			Id:    1,
+			Roles: []string{
+				"admin",
+			},
+			UUID: "8f068dce-c664-11e8-a21b-02286126d5c8",
+		},
+	}
+}
+
+type IDToken struct {
+	Name  string
+	Email string
+}
+
+type AccessToken struct {
+	Mercure Mercure
+	User User
+}
+
+type Mercure struct {
+	Subscribe []string
+}
+
+type User struct {
+	Email string
+	Id int
+	Roles []string
+	UUID string
 }

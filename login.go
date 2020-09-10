@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"html/template"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/julienschmidt/httprouter"
@@ -35,6 +37,11 @@ var loginGetTemplate = template.Must(template.New("").Parse(`<html>
 </body>
 </html>`))
 
+type State struct {
+	RedirectURL string
+	Altk        string
+}
+
 func handleLoginGet(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	loginChallenge := r.URL.Query().Get("login_challenge")
 	admin := getHydraAdmin()
@@ -44,6 +51,40 @@ func handleLoginGet(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 			LoginChallenge: loginChallenge,
 			Context:        DefaultContext,
 		})
+
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+
+	requestURL, err := url.Parse(*getLoginRequestOk.Payload.RequestURL)
+	if requestURL != nil {
+		state := &State{}
+		stateJson := requestURL.Query().Get("state")
+		err = json.Unmarshal([]byte(stateJson), state)
+		if state.Altk != "" {
+			//todo auth user by altk
+			userIDFromAltk := "foo_altk@ppro.it"
+
+			accept, err := admin.Admin.AcceptLoginRequest(
+				&admin2.AcceptLoginRequestParams{
+					Body: &models.AcceptLoginRequest{
+						Subject: &userIDFromAltk,
+					},
+					LoginChallenge: loginChallenge,
+					Context:        DefaultContext,
+				},
+			)
+
+			if err != nil {
+				handleError(w, err)
+				return
+			}
+
+			http.Redirect(w, r, *accept.GetPayload().RedirectTo, 301) // todo check code
+			return
+		}
+	}
 
 	if err != nil {
 		handleError(w, err)
@@ -73,11 +114,11 @@ func handleLoginGet(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 	_ = loginGetTemplate.Execute(w, struct {
 		CsrfToken      string
 		LoginChallenge string
-		Error string
+		Error          string
 	}{
 		CsrfToken:      "change me",
 		LoginChallenge: loginChallenge,
-		Error: "",
+		Error:          "",
 	})
 }
 
@@ -96,11 +137,11 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 		_ = loginGetTemplate.Execute(w, struct {
 			CsrfToken      string
 			LoginChallenge string
-			Error string
+			Error          string
 		}{
 			CsrfToken:      "change me",
 			LoginChallenge: r.Form.Get("challenge"),
-			Error: "The username / password combination is not correct",
+			Error:          "The username / password combination is not correct",
 		})
 
 		return
@@ -111,8 +152,8 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 	accept, err := admin.Admin.AcceptLoginRequest(
 		&admin2.AcceptLoginRequestParams{
 			Body: &models.AcceptLoginRequest{
-				Subject: &email,
-				Remember: remember,
+				Subject:     &email,
+				Remember:    remember,
 				RememberFor: 3600,
 			},
 			LoginChallenge: r.Form.Get("challenge"),

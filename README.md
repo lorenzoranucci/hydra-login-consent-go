@@ -48,13 +48,13 @@ docker run -d \
  Start Login and Consent app:
  
  ```sh
- go run ./...
+go run ./...
  ```
  
  Register an example client in Hydra and start it using Hydra demo utilities:
   
  ```sh
- docker run --rm -it \
+docker run --rm -it \
   -e HYDRA_ADMIN_URL=https://ory-hydra-example--hydra:4445 \
   --network hydraguide \
   oryd/hydra:v1.7.4 \
@@ -66,7 +66,7 @@ docker run -d \
     --scope openid,offline,photos.read \
     --callbacks http://127.0.0.1:9010/callback
     
- docker run --rm -it \
+docker run --rm -it \
   --network hydraguide \
   -p 9010:9010 \
   oryd/hydra:v1.7.4 \
@@ -79,3 +79,21 @@ docker run -d \
     --scope openid,offline,photos.read
 ```
   
+If you want to play with https://github.com/lorenzoranucci/hydra-client-go client:
+   
+  ```sh
+docker run --rm -it \
+   -e HYDRA_ADMIN_URL=https://ory-hydra-example--hydra:4445 \
+   --network hydraguide \
+   oryd/hydra:v1.7.4 \
+   clients create --skip-tls-verify \
+     --id client-frontend.localhost \
+     --secret some-secret \
+     --grant-types authorization_code,refresh_token,client_credentials,implicit \
+     --response-types token,code,id_token \
+     --scope openid,offline \
+     --callbacks http://client-frontend.localhost:9011/login-callback
+     
+cd ../hydra-client-go
+go run ./...
+ ```
