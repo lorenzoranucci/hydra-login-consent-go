@@ -26,6 +26,12 @@ var DefaultContext = context.WithValue(context.Background(), oauth2.HTTPClient, 
 	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 }})
 
+var FacebookClientID = 236838367690513
+var FacebookClientSecret = "b6f57361a9e222c0a3697918150dcb93"
+var	FacebookRedirectURI = fmt.Sprintf("http://localhost:%d/social-login/callback/facebook", Port)
+var FacebookLoginEndpoint = "https://www.facebook.com/v8.0/dialog/oauth"
+var FacebookAccessTokenEndpoint = "https://graph.facebook.com/v8.0/oauth/access_token?client_id=%d&client_secret=%s&redirect_uri=%s&code=%s"
+
 func main()  {
 	r := httprouter.New()
 	server := &http.Server{Addr: fmt.Sprintf(":%d", Port), Handler: r}
@@ -35,8 +41,13 @@ func main()  {
 	r.GET("/consent", handleConsentGet)
 	r.POST("/consent", handleConsentPost)
 
+	r.GET("/social-login/callback/facebook", handleSocialLoginCallbackGet)
+
 	err := server.ListenAndServe()
 	panic(err)
+}
+
+func profileHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func getHydraAdmin() *hydra.OryHydra {

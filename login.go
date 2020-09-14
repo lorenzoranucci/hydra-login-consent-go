@@ -12,31 +12,6 @@ import (
 	"github.com/ory/hydra-client-go/models"
 )
 
-var loginGetTemplate = template.Must(template.New("").Parse(`<html>
-<head></head>
-<body>
-<h1>Login</h1>
-<h2>{{ .Error }}</h2>
-<form action="/login" method="POST">
-    <input type="hidden" name="_csrf" value="{{ .CsrfToken }}">
-    <input type="hidden" name="challenge" value="{{ .LoginChallenge }}">
-    <table style="">
-        <tbody>
-        <tr>
-            <td><input type="email" id="email" name="email" placeholder="email@foobar.com"></td>
-            <td>(it's "foo@bar.com")</td>
-        </tr>
-        <tr>
-            <td><input type="password" id="password" name="password"></td>
-            <td>(it's "foobar")</td>
-        </tr>
-        </tbody>
-    </table>
-    <input type="checkbox" id="remember" name="remember" value="1"><label for="remember">Remember me</label><br><input
-        type="submit" id="accept" value="Log in"></form>
-</body>
-</html>`))
-
 type State struct {
 	RedirectURL string
 	Altk        string
@@ -111,15 +86,7 @@ func handleLoginGet(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 		return
 	}
 
-	_ = loginGetTemplate.Execute(w, struct {
-		CsrfToken      string
-		LoginChallenge string
-		Error          string
-	}{
-		CsrfToken:      "change me",
-		LoginChallenge: loginChallenge,
-		Error:          "",
-	})
+	renderLoginGetTemplate(w, loginChallenge, "")
 }
 
 func handleLoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -133,16 +100,10 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 	password := r.Form.Get("password")
 	remember, _ := strconv.ParseBool(r.Form.Get("remember"))
 
+	loginChallenge := r.Form.Get("challenge")
 	if email == "" && password == "" {
-		_ = loginGetTemplate.Execute(w, struct {
-			CsrfToken      string
-			LoginChallenge string
-			Error          string
-		}{
-			CsrfToken:      "change me",
-			LoginChallenge: r.Form.Get("challenge"),
-			Error:          "The username / password combination is not correct",
-		})
+		loginError := "The username / password combination is not correct"
+		renderLoginGetTemplate(w, loginChallenge, loginError)
 
 		return
 	}
@@ -156,7 +117,7 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 				Remember:    remember,
 				RememberFor: 3600,
 			},
-			LoginChallenge: r.Form.Get("challenge"),
+			LoginChallenge: loginChallenge,
 			Context:        DefaultContext,
 		},
 	)
@@ -169,3 +130,50 @@ func handleLoginPost(w http.ResponseWriter, r *http.Request, _ httprouter.Params
 	http.Redirect(w, r, *accept.GetPayload().RedirectTo, 301) // todo check code
 	return
 }
+
+var loginGetTemplate = template.Must(template.New("").Parse(`<html>
+<head></head>
+<body>
+<h1>Login</h1>
+<h2>{{ .Error }}</h2>
+<form action="/login" method="POST">
+    <input type="hidden" name="_csrf" value="{{ .CsrfToken }}">
+    <input type="hidden" name="challenge" value="{{ .LoginChallenge }}">
+    <table style="">
+        <tbody>
+        <tr>
+            <td><input type="email" id="email" name="email" placeholder="email@foobar.com"></td>
+            <td>(it's "foo@bar.com")</td>
+        </tr>
+        <tr>
+            <td><input type="password" id="password" name="password"></td>
+            <td>(it's "foobar")</td>
+        </tr>
+        </tbody>
+    </table>
+    <input type="checkbox" id="remember" name="remember" value="1"><label for="remember">Remember me</label><br><input
+        type="submit" id="accept" value="Log in"></form>
+
+	<br/>
+	<a href="{{ .FacebookLoginEndpoint }}?client_id={{ .FacebookClientID }}&redirect_uri={{ .FacebookRedirectURI }}&state={{ .LoginChallenge}}">Login with Facebook</a>
+
+</body>
+</html>`))
+func renderLoginGetTemplate(w http.ResponseWriter, loginChallenge string, loginError string) {
+	_ = loginGetTemplate.Execute(w, struct {
+		CsrfToken           string
+		LoginChallenge      string
+		Error               string
+		FacebookClientID    int
+		FacebookRedirectURI string
+		FacebookLoginEndpoint string
+	}{
+		CsrfToken:           "change me",
+		LoginChallenge:      loginChallenge,
+		Error:               loginError,
+		FacebookClientID:    FacebookClientID,
+		FacebookRedirectURI: FacebookRedirectURI,
+		FacebookLoginEndpoint: FacebookLoginEndpoint,
+	})
+}
+

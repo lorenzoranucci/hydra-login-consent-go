@@ -42,6 +42,8 @@ docker run -d \
   -e URLS_SELF_ISSUER=https://localhost:9000/ \
   -e URLS_CONSENT=http://localhost:9020/consent \
   -e URLS_LOGIN=http://localhost:9020/login \
+  -e STRATEGIES_ACCESS_TOKEN=jwt \
+  -e SECRETS_SYSTEM=prontopro-jwt-secret \
   oryd/hydra:v1.7.4 serve all
   ```
   
