@@ -59,7 +59,7 @@ func (h *HydraLoginHandler) handleLoginGet(w http.ResponseWriter, r *http.Reques
 	}
 
 	if loginRequest.LoginRequestSkipForUser != nil {
-		h.acceptLoginAndRedirect(
+		err = h.hydraClient.AcceptLoginAndRedirect(
 			w,
 			r,
 			loginChallenge,
@@ -67,6 +67,9 @@ func (h *HydraLoginHandler) handleLoginGet(w http.ResponseWriter, r *http.Reques
 			nil,
 			nil,
 		)
+		if err != nil {
+			fail(w, fmt.Errorf("cannot accept login challenge"), 500)
+		}
 		return
 	}
 
@@ -75,28 +78,39 @@ func (h *HydraLoginHandler) handleLoginGet(w http.ResponseWriter, r *http.Reques
 			application.SignInUserWithAutoLoginTokenRequest{AutoLoginToken: *loginRequest.LoginRequestState.ALTK},
 		)
 		if err != nil {
-			h.rejectLoginAndRedirect(
+			err = h.hydraClient.RejectLoginAndRedirect(
 				w,
 				r,
 				loginChallenge,
 				fmt.Errorf("internal error finding user with given auto login token"),
 			)
+
+			if err != nil {
+				fail(w, fmt.Errorf("cannot reject login challenge"), 500)
+			}
 			return
 		}
 
 		if !found {
-			h.rejectLoginAndRedirect(
+			err = h.hydraClient.RejectLoginAndRedirect(
 				w,
 				r,
 				loginChallenge,
 				fmt.Errorf("cannot find user with given auto login token"),
 			)
+
+			if err != nil {
+				fail(w, fmt.Errorf("cannot reject login challenge"), 500)
+			}
 			return
 		}
 
 		remember := true
 		var rememberFor int64 = 0
-		h.acceptLoginAndRedirect(w, r, loginChallenge, user.UUID.String(), &remember, &rememberFor)
+		err = h.hydraClient.AcceptLoginAndRedirect(w, r, loginChallenge, user.Email, &remember, &rememberFor)
+		if err != nil {
+			fail(w, fmt.Errorf("cannot accept login challenge"), 500)
+		}
 		return
 	}
 
@@ -106,18 +120,22 @@ func (h *HydraLoginHandler) handleLoginGet(w http.ResponseWriter, r *http.Reques
 		)
 
 		if err != nil {
-			h.rejectLoginAndRedirect(
+			err = h.hydraClient.RejectLoginAndRedirect(
 				w,
 				r,
 				loginChallenge,
 				fmt.Errorf("invalid social login provider"),
 			)
+
+			if err != nil {
+				fail(w, fmt.Errorf("cannot reject login challenge"), 500)
+			}
 			return
 		}
 
-		endpoint, err := socialLoginProvider.GetLoginURL(loginChallenge)
+		endpoint, err := socialLoginProvider.GetLoginEndpoint(loginChallenge)
 		if err != nil {
-			h.rejectLoginAndRedirect(
+			err = h.hydraClient.RejectLoginAndRedirect(
 				w,
 				r,
 				loginChallenge,
@@ -127,6 +145,11 @@ func (h *HydraLoginHandler) handleLoginGet(w http.ResponseWriter, r *http.Reques
 					loginChallenge,
 				),
 			)
+
+			if err != nil {
+				fail(w, fmt.Errorf("cannot reject login challenge"), 500)
+			}
+
 			return
 		}
 		http.Redirect(w, r, endpoint.String(), 301)
@@ -151,7 +174,7 @@ func (h *HydraLoginHandler) handleLoginPost(w http.ResponseWriter, r *http.Reque
 	}
 
 	if loginRequest.LoginRequestSkipForUser != nil {
-		h.acceptLoginAndRedirect(
+		err = h.hydraClient.AcceptLoginAndRedirect(
 			w,
 			r,
 			loginChallenge,
@@ -159,6 +182,10 @@ func (h *HydraLoginHandler) handleLoginPost(w http.ResponseWriter, r *http.Reque
 			nil,
 			nil,
 		)
+
+		if err != nil {
+			fail(w, fmt.Errorf("cannot accept login challenge"), 500)
+		}
 		return
 	}
 
@@ -188,48 +215,10 @@ func (h *HydraLoginHandler) handleLoginPost(w http.ResponseWriter, r *http.Reque
 
 	remember := true
 	var rememberFor int64 = 0
-	h.acceptLoginAndRedirect(w, r, loginChallenge, user.UUID.String(), &remember, &rememberFor)
-}
-
-func (h *HydraLoginHandler) acceptLoginAndRedirect(
-	w http.ResponseWriter,
-	r *http.Request,
-	loginChallenge string,
-	userID string,
-	remember *bool,
-	rememberFor *int64,
-) {
-	loginAccepted, err := h.hydraClient.AcceptLoginRequest(
-		loginChallenge,
-		userID,
-		remember,
-		rememberFor,
-	)
-
+	err = h.hydraClient.AcceptLoginAndRedirect(w, r, loginChallenge, user.Email, &remember, &rememberFor)
 	if err != nil {
 		fail(w, fmt.Errorf("cannot accept login challenge"), 500)
-		return
 	}
-
-	http.Redirect(w, r, loginAccepted.RedirectTo, 301)
-	return
-}
-
-func (h *HydraLoginHandler) rejectLoginAndRedirect(
-	w http.ResponseWriter,
-	r *http.Request,
-	loginChallenge string,
-	loginError error,
-) {
-	loginRejected, err :=h.hydraClient.RejectLoginRequest(loginChallenge, loginError)
-
-	if err != nil {
-		fail(w, fmt.Errorf("cannot reject login challenge"), 500)
-		return
-	}
-
-	http.Redirect(w, r, loginRejected.RedirectTo, 301)
-	return
 }
 
 var loginGetTemplate = template.Must(template.New("").Parse(`<html>
@@ -239,7 +228,7 @@ var loginGetTemplate = template.Must(template.New("").Parse(`<html>
 <h2>{{ .Error }}</h2>
 <form action="/login" method="POST">
     <input type="hidden" name="_csrf" value="{{ .CsrfToken }}">
-    <input type="hidden" name="challenge" value="{{ .LoginChallenge }}">
+    <input type="hidden" name="login_challenge" value="{{ .LoginChallenge }}">
     <table style="">
         <tbody>
         <tr>
@@ -279,13 +268,13 @@ func (h *HydraLoginHandler) renderLoginGetTemplate(
 		return
 	}
 
-	facebookLoginURL, err := facebook.GetLoginURL(loginChallenge)
+	facebookLoginURL, err := facebook.GetLoginEndpoint(loginChallenge)
 	if err != nil {
 		fail(w, fmt.Errorf("cannot reject login challenge"), 500)
 		return
 	}
 
-	googleLoginURL, err := google.GetLoginURL(loginChallenge)
+	googleLoginURL, err := google.GetLoginEndpoint(loginChallenge)
 	if err != nil {
 		fail(w, fmt.Errorf("cannot reject login challenge"), 500)
 		return

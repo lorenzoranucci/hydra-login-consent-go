@@ -1,8 +1,8 @@
-package mysql
+package mock
 
 import (
-	"github.com/google/uuid"
-	"github.com/lorenzoranucci/hydra-login-consent-go/internal/pkg/domain"
+"github.com/google/uuid"
+"github.com/lorenzoranucci/hydra-login-consent-go/internal/pkg/domain"
 )
 
 var usersByEmail = map[string]*domain.User{
@@ -10,7 +10,6 @@ var usersByEmail = map[string]*domain.User{
 		ID:                       1,
 		UUID:                     uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 		Email:                    "foo@bar.com",
-		Password:                 "1234",
 		FirstName:                "Foo",
 		LastName:                 "Bar",
 		AutoLoginToken:           "12345",
@@ -58,12 +57,12 @@ func NewUserRepository() *UserRepository {
 }
 
 func (u *UserRepository) FindByEmail(email string) (*domain.User, bool, error) {
-	user, found := usersByEmail[email]
+	user, found :=  usersByEmail[email]
 	return user, found, nil
 }
 
 func (u *UserRepository) FindByEmailAndPassword(email string, password string) (*domain.User, bool, error) {
-	user, found := usersByEmailAndPassword[email+password]
+	user, found :=  usersByEmailAndPassword[email+password]
 	return user, found, nil
 }
 
@@ -71,12 +70,12 @@ func (u *UserRepository) FindBySocialLoginProviderUserID(
 	socialLoginProviderUserID string,
 	socialLoginProvider domain.SocialLoginProvider,
 ) (*domain.User, bool, error) {
-	user, found := usersByEmailAndPassword[socialLoginProviderUserID+socialLoginProvider.GetID()]
+	user, found :=  usersByEmailAndPassword[socialLoginProviderUserID+socialLoginProvider.GetID()]
 	return user, found, nil
 }
 
 func (u *UserRepository) FindByAutoLoginToken(autoLoginToken string) (*domain.User, bool, error) {
-	user, found := usersByAltk[autoLoginToken]
+	user, found :=  usersByAltk[autoLoginToken]
 	return user, found, nil
 }
 
@@ -89,3 +88,4 @@ func (u *UserRepository) Persist(user domain.User) error {
 	}
 	return nil
 }
+

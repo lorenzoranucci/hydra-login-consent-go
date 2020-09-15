@@ -9,15 +9,15 @@ import (
 )
 
 type Server struct {
-	m           *http.ServeMux
-	port        int
+	m    *http.ServeMux
+	port int
 }
 
 func NewServer(
 	port int,
 ) *Server {
 	srv := &Server{
-		m: http.NewServeMux(),
+		m:    http.NewServeMux(),
 		port: port,
 	}
 
@@ -36,10 +36,24 @@ func NewServer(
 			serviceLocator.GoogleID(),
 		),
 	)
-	/*srv.m.Handle("/login/social/facebook", )
-	srv.m.Handle("/login/social/google", )
-	srv.m.Handle("/consent", )*/
+	srv.m.Handle(
+		"/consent",
+		handler.NewHydraConsentHandler(
+			serviceLocator.UserRepository(),
+			serviceLocator.CreateHydraClient(),
+		),
+	)
 
+	srv.m.Handle(
+		"/login/social/facebook",
+		handler.NewFacebookSocialLoginCallbackHandler(
+			serviceLocator.CreateSignInUserWithSocialLoginService(),
+			serviceLocator.CreateFacebookSocialLoginProvider(),
+			serviceLocator.CreateHydraClient(),
+		),
+	)
+	/*srv.m.Handle("/login/social/google", )
+	*/
 
 	return srv
 }

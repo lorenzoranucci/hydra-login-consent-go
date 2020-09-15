@@ -9,47 +9,45 @@ import (
 	"time"
 
 	httptransport "github.com/go-openapi/runtime/client"
+	"github.com/lorenzoranucci/hydra-login-consent-go/internal/pkg/domain"
 	hydra "github.com/ory/hydra-client-go/client"
 	"github.com/ory/hydra-client-go/client/admin"
-	"github.com/ory/hydra-client-go/models"
 	"golang.org/x/oauth2"
 )
 
-type LoginRequest struct {
-	LoginRequestSkipForUser *LoginRequestSkipForUser
-	LoginRequestState       *LoginRequestState
-}
-
-type LoginRequestSkipForUser struct {
-	UserID            string
-}
-
-type LoginAccepted struct {
-	RedirectTo string
-}
-
-type LoginRejected struct {
-	RedirectTo string
-}
-
-type LoginRequestState struct {
-	ALTK *string
-	SocialLoginProviderID *string
-}
-
 type HydraClientInterface interface {
 	GetLoginRequest(loginChallenge string) (*LoginRequest, error)
-	AcceptLoginRequest(
+
+	AcceptLoginAndRedirect(
+		w http.ResponseWriter,
+		r *http.Request,
 		loginChallenge string,
 		userID string,
 		remember *bool,
 		rememberFor *int64,
-	) (*LoginAccepted, error)
+	) error
 
-	RejectLoginRequest(
+	RejectLoginAndRedirect(
+		w http.ResponseWriter,
+		r *http.Request,
 		loginChallenge string,
 		loginError error,
-	) (*LoginRejected, error)
+	) error
+
+	GetConsentRequest(consentChallenge string) (*ConsentRequest, error)
+
+	AcceptConsentRequest(
+		consentChallenge string,
+		user domain.User,
+		grantScopes []string,
+		grantAudience []string,
+		remember bool,
+	) (*ConsentAccepted, error)
+
+	RejectConsentRequest(
+		consentChallenge string,
+		consentError error,
+	) (*ConsentRejected, error)
 }
 
 type HydraClientStruct struct {
@@ -58,97 +56,6 @@ type HydraClientStruct struct {
 
 func NewHydraClientStruct(hydraAdminURL *url.URL) *HydraClientStruct {
 	return &HydraClientStruct{hydraAdminURL: hydraAdminURL}
-}
-
-func (h *HydraClientStruct) GetLoginRequest(loginChallenge string) (*LoginRequest, error) {
-	getLoginRequestOk, err := (*h.getAdmin()).GetLoginRequest(
-		&admin.GetLoginRequestParams{
-			LoginChallenge: loginChallenge,
-			Context:        h.getDefaultContext(),
-		})
-
-	if err != nil {
-		return nil, err
-	}
-
-	loginRequest := &LoginRequest{
-		LoginRequestSkipForUser: getLoginRequestSkipForUser(getLoginRequestOk),
-		LoginRequestState:       getLoginRequestState(getLoginRequestOk),
-	}
-
-	return loginRequest, nil
-}
-
-func (h *HydraClientStruct) AcceptLoginRequest(
-	loginChallenge string,
-	userID string,
-	remember *bool,
-	rememberFor *int64,
-) (*LoginAccepted, error) {
-	body := &models.AcceptLoginRequest{
-		Subject: &userID,
-	}
-
-	if remember != nil && rememberFor != nil {
-		body.Remember = *remember
-		body.RememberFor = *rememberFor
-	}
-
-	accept, err := (*h.getAdmin()).AcceptLoginRequest(
-		&admin.AcceptLoginRequestParams{
-			Body:           body,
-			LoginChallenge: loginChallenge,
-			Context:        h.getDefaultContext(),
-		},
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &LoginAccepted{RedirectTo: *accept.GetPayload().RedirectTo}, nil
-}
-
-func (h *HydraClientStruct) RejectLoginRequest(
-	loginChallenge string,
-	loginError error,
-) (*LoginRejected, error) {
-	body := &models.RejectRequest{
-		Error: loginError.Error(),
-	}
-
-	reject, err := (*h.getAdmin()).RejectLoginRequest(
-		&admin.RejectLoginRequestParams{
-			Body:           body,
-			LoginChallenge: loginChallenge,
-			Context:        h.getDefaultContext(),
-		},
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &LoginRejected{RedirectTo: *reject.GetPayload().RedirectTo}, nil
-}
-
-func (h *HydraClientStruct) AcceptConsentRequest(
-	consentChallenge string,
-	userID string,
-	remember *bool,
-	rememberFor *int64,
-) (*LoginAccepted, error) {
-	accept, err := (*h.getAdmin()).AcceptConsentRequest(
-		&admin.AcceptConsentRequestParams{
-			Body: &models.AcceptConsentRequest{
-				GrantAccessTokenAudience: consentRequest.Payload.RequestedAccessTokenAudience, // todo investigate if we can open to all audiences
-				GrantScope:               []string{"openid", "offline"},                       // todo investigate how to fill this
-				Remember:                 true,
-				Session: getConsentRequestSession(consentRequest),
-			},
-			ConsentChallenge: *consentRequest.Payload.Challenge,
-			Context:          DefaultContext,
-		})
 }
 
 func (h *HydraClientStruct) getDefaultContext() context.Context {
@@ -202,4 +109,3 @@ func getLoginRequestState(getLoginRequestOk *admin.GetLoginRequestOK) *LoginRequ
 
 	return state
 }
-

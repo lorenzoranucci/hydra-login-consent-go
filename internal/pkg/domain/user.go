@@ -2,16 +2,22 @@ package domain
 
 import (
 	"fmt"
+	"math/rand"
+	"time"
 
 	"github.com/google/uuid"
 )
 
 type User struct {
-	UUID                     uuid.UUID
-	Email                    string
-	Name                     string
-	SecondName               string
-	AutoLoginToken           string
+	ID             int
+	UUID           uuid.UUID
+	Email          string
+	Password       string
+	FirstName      string
+	LastName       string
+	AutoLoginToken string
+	Roles          []string
+
 	SocialLoginProviderUsers UserSocialLoginProviderUsers
 }
 
@@ -22,10 +28,13 @@ func CreateUserFromSocialLoginProviderUser(
 	socialLoginProvider SocialLoginProvider,
 ) *User {
 	return &User{
-		UUID:       uuid.New(),
-		Email:      socialLoginProviderUser.Email,
-		Name:       socialLoginProviderUser.Name,
-		SecondName: socialLoginProviderUser.SecondName,
+		UUID:           uuid.New(),
+		Email:          socialLoginProviderUser.Email,
+		Password:       password(15),
+		FirstName:      socialLoginProviderUser.FirstName,
+		LastName:       socialLoginProviderUser.LastName,
+		AutoLoginToken: uuid.New().String(),
+		Roles:          []string{},
 		SocialLoginProviderUsers: UserSocialLoginProviderUsers{
 			socialLoginProvider: socialLoginProviderUser,
 		},
@@ -61,10 +70,23 @@ func (u *User) AddSocialLoginProviderUser(
 
 type UserRepository interface {
 	FindByEmail(email string) (*User, bool, error)
-	FindByEmailAndPassword(email string) (*User, bool, error)
+	FindByEmailAndPassword(email string, password string) (*User, bool, error)
 	FindBySocialLoginProviderUserID(
 		socialLoginProviderUserID string,
 		socialLoginProvider SocialLoginProvider,
 	) (*User, bool, error)
 	FindByAutoLoginToken(autoLoginToken string) (*User, bool, error)
+	Persist(user User) error
+}
+
+func password(length int) string {
+	var seededRand *rand.Rand = rand.New(
+		rand.NewSource(time.Now().UnixNano()))
+
+	charset := "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[seededRand.Intn(len(charset))]
+	}
+	return string(b)
 }

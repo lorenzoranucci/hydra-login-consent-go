@@ -42,23 +42,28 @@ func (s SignInWithSocialLoginService) Execute(
 	}
 
 	if !found {
-		user, found, err = s.userRepository.FindByEmail(
+		user, foundByEmail, err := s.userRepository.FindByEmail(
 			socialLoginProviderUser.Email,
 		)
 		if err != nil {
 			return nil, err
 		}
 
-		if found {
-			err = user.AddSocialLoginProviderUser(socialLoginProviderUser, signInRequest.SocialLoginProvider)
+		if foundByEmail {
+			err = user.AddSocialLoginProviderUser(*socialLoginProviderUser, signInRequest.SocialLoginProvider)
 			if err != nil {
 				return nil, err
 			}
 		} else {
 			user = domain.CreateUserFromSocialLoginProviderUser(
-				socialLoginProviderUser,
+				*socialLoginProviderUser,
 				signInRequest.SocialLoginProvider,
 			)
+		}
+
+		err = s.userRepository.Persist(*user)
+		if err != nil {
+			return nil, err
 		}
 	}
 

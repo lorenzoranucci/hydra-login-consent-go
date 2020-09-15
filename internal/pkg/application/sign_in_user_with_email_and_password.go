@@ -24,5 +24,5 @@ func NewSignInUserWithEmailAndPasswordService(userRepository domain.UserReposito
 func (s SignInUserWithEmailAndPasswordService) Execute(
 	signInRequest SignInUserWithEmailAndPasswordRequest,
 ) (*domain.User, bool, error) {
-	return s.userRepository.FindByEmailAndPassword(signInRequest.Password)
+	return s.userRepository.FindByEmailAndPassword(signInRequest.Email, signInRequest.Password)
 }

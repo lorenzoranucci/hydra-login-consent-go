@@ -11,6 +11,7 @@ import (
 	"github.com/lorenzoranucci/hydra-login-consent-go/internal/pkg/infrastructure/hydra"
 	"github.com/lorenzoranucci/hydra-login-consent-go/internal/pkg/infrastructure/mysql"
 	"github.com/lorenzoranucci/hydra-login-consent-go/internal/pkg/infrastructure/social_login_provider"
+	"github.com/lorenzoranucci/hydra-login-consent-go/internal/test/mock"
 )
 
 var serviceLocator *ServiceLocator
@@ -44,16 +45,25 @@ func ResetServiceLocator() *ServiceLocator {
 }
 
 func (sl *ServiceLocator) UserRepository() domain.UserRepository {
-	return sl.mysqlUserRepository()
+	return sl.mockUserRepository()
 }
 
-func (sl *ServiceLocator) mysqlUserRepository() mysql.UserRepository {
-	_, found := sl.userRepository.(mysql.UserRepository)
+func (sl *ServiceLocator) mysqlUserRepository() *mysql.UserRepository {
+	_, found := sl.userRepository.(*mysql.UserRepository)
 	if !found {
-		sl.userRepository = *mysql.NewUserRepository()
+		sl.userRepository = mysql.NewUserRepository()
 	}
 
-	return sl.userRepository.(mysql.UserRepository)
+	return sl.userRepository.(*mysql.UserRepository)
+}
+
+func (sl *ServiceLocator) mockUserRepository() *mock.UserRepository {
+	_, found := sl.userRepository.(*mock.UserRepository)
+	if !found {
+		sl.userRepository = mock.NewUserRepository()
+	}
+
+	return sl.userRepository.(*mock.UserRepository)
 }
 
 func (sl *ServiceLocator) CreateSignInUserWithEmailAndPasswordService() application.SignInUserWithEmailAndPasswordServiceInterface {
@@ -109,7 +119,7 @@ func (sl *ServiceLocator) CreateSocialLoginProviderFactory() social_login_provid
 	return sl.socialLoginProviderFactory
 }
 
-func (sl *ServiceLocator) CreateFacebookSocialLoginProvider() domain.SocialLoginProvider {
+func (sl *ServiceLocator) CreateFacebookSocialLoginProvider() *social_login_provider.Facebook {
 	if sl.facebookSocialLoginProvider == nil {
 		clientID, err := strconv.Atoi(os.Getenv("FACEBOOK_CLIENT_ID"))
 		if err != nil {
@@ -119,15 +129,18 @@ func (sl *ServiceLocator) CreateFacebookSocialLoginProvider() domain.SocialLogin
 		sl.facebookSocialLoginProvider = social_login_provider.NewFacebook(
 			sl.FacebookID(),
 			clientID,
-			os.Getenv("FACEBOOK_LOGIN_CALLBACK_ENDPOINT"),
-			os.Getenv("FACEBOOK_LOGIN_ENDPOINT"),
+			os.Getenv("FACEBOOK_CLIENT_SECRET"),
+			os.Getenv("FACEBOOK_REDIRECT_URI"),
+			os.Getenv("FACEBOOK_AUTH_ENDPOINT"),
+			os.Getenv("FACEBOOK_TOKEN_ENDPOINT"),
+			os.Getenv("FACEBOOK_VERIFY_TOKEN_ENDPOINT"),
 		)
 	}
 
-	return sl.facebookSocialLoginProvider
+	return sl.facebookSocialLoginProvider.(*social_login_provider.Facebook)
 }
 
-func (sl *ServiceLocator) CreateGoogleSocialLoginProvider() domain.SocialLoginProvider {
+func (sl *ServiceLocator) CreateGoogleSocialLoginProvider() *social_login_provider.Google {
 	if sl.googleSocialLoginProvider == nil {
 		clientID, err := strconv.Atoi(os.Getenv("GOOGLE_CLIENT_ID"))
 		if err != nil {
@@ -137,12 +150,15 @@ func (sl *ServiceLocator) CreateGoogleSocialLoginProvider() domain.SocialLoginPr
 		sl.googleSocialLoginProvider = social_login_provider.NewGoogle(
 			sl.GoogleID(),
 			clientID,
-			os.Getenv("GOOGLE_LOGIN_CALLBACK_ENDPOINT"),
-			os.Getenv("GOOGLE_LOGIN_ENDPOINT"),
+			os.Getenv("GOOGLE_CLIENT_SECRET"),
+			os.Getenv("GOOGLE_REDIRECT_URI"),
+			os.Getenv("GOOGLE_AUTH_ENDPOINT"),
+			os.Getenv("GOOGLE_TOKEN_ENDPOINT"),
+			os.Getenv("GOOGLE_VERIFY_TOKEN_ENDPOINT"),
 		)
 	}
 
-	return sl.googleSocialLoginProvider
+	return sl.googleSocialLoginProvider.(*social_login_provider.Google)
 }
 
 func (sl *ServiceLocator) FacebookID() string {
