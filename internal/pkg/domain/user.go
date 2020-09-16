@@ -9,76 +9,132 @@ import (
 )
 
 type User struct {
-	ID             int
-	UUID           uuid.UUID
-	Email          string
-	Password       string
-	FirstName      string
-	LastName       string
-	AutoLoginToken string
-	Roles          []string
+	id             int
+	uuid           uuid.UUID
+	email          string
+	password       string
+	firstName      string
+	lastName       string
+	autoLoginToken string
+	roles          []string
 
-	SocialLoginProviderUsers UserSocialLoginProviderUsers
+	socialLoginProviderUsers UserSocialLoginProviderUsers
 }
 
-type UserSocialLoginProviderUsers map[SocialLoginProvider]SocialLoginProviderUser
-
-func CreateUserFromSocialLoginProviderUser(
-	socialLoginProviderUser SocialLoginProviderUser,
-	socialLoginProvider SocialLoginProvider,
+func NewUser(
+	uuid uuid.UUID,
+	email string,
+	password string,
+	firstName string,
+	lastName string,
+	autoLoginToken string,
+	roles []string,
+	socialLoginProviderUsers UserSocialLoginProviderUsers,
 ) *User {
 	return &User{
-		UUID:           uuid.New(),
-		Email:          socialLoginProviderUser.Email,
-		Password:       password(15),
-		FirstName:      socialLoginProviderUser.FirstName,
-		LastName:       socialLoginProviderUser.LastName,
-		AutoLoginToken: uuid.New().String(),
-		Roles:          []string{},
-		SocialLoginProviderUsers: UserSocialLoginProviderUsers{
-			socialLoginProvider: socialLoginProviderUser,
-		},
+		uuid:                     uuid,
+		email:                    email,
+		password:                 password,
+		firstName:                firstName,
+		lastName:                 lastName,
+		autoLoginToken:           autoLoginToken,
+		roles:                    roles,
+		socialLoginProviderUsers: socialLoginProviderUsers,
 	}
+}
+
+func (u *User) Id() int {
+	return u.id
+}
+
+func (u *User) Uuid() uuid.UUID {
+	return u.uuid
+}
+
+func (u *User) Email() string {
+	return u.email
+}
+
+func (u *User) Password() string {
+	return u.password
+}
+
+func (u *User) FirstName() string {
+	return u.firstName
+}
+
+func (u *User) LastName() string {
+	return u.lastName
+}
+
+func (u *User) AutoLoginToken() string {
+	return u.autoLoginToken
+}
+
+func (u *User) Roles() []string {
+	return u.roles
+}
+
+func (u *User) SocialLoginProviderUsers() UserSocialLoginProviderUsers {
+	return u.socialLoginProviderUsers
+}
+
+type UserSocialLoginProviderUsers map[string]*SocialLoginProviderUser
+
+func CreateUserFromSocialLoginProviderUser(
+	socialLoginProviderUser *SocialLoginProviderUser,
+) (*User, error) {
+	return NewUser(
+		uuid.New(),
+		socialLoginProviderUser.Email(),
+		password(15),
+		socialLoginProviderUser.firstName,
+		socialLoginProviderUser.lastName,
+		generateAutoLoginToken(),
+		[]string{},
+		UserSocialLoginProviderUsers{
+			socialLoginProviderUser.SocialLoginProviderID(): socialLoginProviderUser,
+		},
+	), nil
 }
 
 func (u *User) AddSocialLoginProviderUser(
-	socialLoginProviderUser SocialLoginProviderUser,
-	socialLoginProvider SocialLoginProvider,
+	socialLoginProviderUser *SocialLoginProviderUser,
 ) error {
-	_, found := u.SocialLoginProviderUsers[socialLoginProvider]
+	_, found := u.socialLoginProviderUsers[socialLoginProviderUser.socialLoginProviderID]
 	if found {
 		return fmt.Errorf(
 			"user '%s' already has an social user associated for provider %s",
-			u.UUID.String(),
-			socialLoginProvider.GetID(),
+			u.uuid.String(),
+			socialLoginProviderUser.socialLoginProviderID,
 		)
 	}
 
-	if u.Email != socialLoginProviderUser.Email {
+	if u.email != socialLoginProviderUser.email {
 		return fmt.Errorf(
 			"user '%s' email '%s' is not equal to social '%s' user '%s' email '%s'",
-			u.UUID.String(),
-			u.Email,
-			socialLoginProvider.GetID(),
-			socialLoginProviderUser.ID,
-			socialLoginProviderUser.Email,
+			u.uuid.String(),
+			u.email,
+			socialLoginProviderUser.socialLoginProviderID,
+			socialLoginProviderUser.id,
+			socialLoginProviderUser.email,
 		)
 	}
-	u.SocialLoginProviderUsers[socialLoginProvider] = socialLoginProviderUser
+	u.socialLoginProviderUsers[socialLoginProviderUser.socialLoginProviderID] = socialLoginProviderUser
 	return nil
 }
 
 type UserRepository interface {
 	FindByEmail(email string) (*User, bool, error)
 	FindByEmailAndPassword(email string, password string) (*User, bool, error)
-	FindBySocialLoginProviderUserID(
-		socialLoginProviderUserID string,
-		socialLoginProvider SocialLoginProvider,
+	FindBySocialLoginProviderUser(
+		socialLoginProviderUser *SocialLoginProviderUser,
 	) (*User, bool, error)
 	FindByAutoLoginToken(autoLoginToken string) (*User, bool, error)
 	Persist(user User) error
 }
 
+/** todo tbd*/
 func password(length int) string {
 	var seededRand *rand.Rand = rand.New(
 		rand.NewSource(time.Now().UnixNano()))
@@ -89,4 +145,9 @@ func password(length int) string {
 		b[i] = charset[seededRand.Intn(len(charset))]
 	}
 	return string(b)
+}
+
+// todo tbd
+func generateAutoLoginToken() string {
+	return uuid.New().String()
 }

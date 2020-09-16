@@ -52,8 +52,15 @@ func NewServer(
 			serviceLocator.CreateHydraClient(),
 		),
 	)
-	/*srv.m.Handle("/login/social/google", )
-	*/
+
+	srv.m.Handle(
+		"/login/social/google",
+		handler.NewGoogleSocialLoginCallbackHandler(
+			serviceLocator.CreateSignInUserWithSocialLoginService(),
+			serviceLocator.CreateGoogleSocialLoginProvider(),
+			serviceLocator.CreateHydraClient(),
+		),
+	)
 
 	return srv
 }

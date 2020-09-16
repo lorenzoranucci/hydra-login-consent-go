@@ -44,17 +44,20 @@ func (h *HydraConsentHandler) handleConsentGet(w http.ResponseWriter, r *http.Re
 	user, found, err := h.userRepository.FindByEmail(consentRequest.UserID)
 
 	if err != nil {
-		h.rejectConsentAndRedirect(
+		err = h.hydraClient.RejectConsentAndRedirect(
 			w,
 			r,
 			consentChallenge,
 			fmt.Errorf("internal error finding user with given consent UserID %s", consentRequest.UserID),
 		)
+		if err != nil {
+			fail(w, fmt.Errorf("cannot reject consent challenge"), 500)
+		}
 		return
 	}
 
 	if !found {
-		err = h.rejectConsentAndRedirect(
+		err = h.hydraClient.RejectConsentAndRedirect(
 			w,
 			r,
 			consentChallenge,
@@ -67,7 +70,7 @@ func (h *HydraConsentHandler) handleConsentGet(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	err = h.acceptConsentAndRedirect(
+	err = h.hydraClient.AcceptConsentAndRedirect(
 		w,
 		r,
 		*consentRequest,
@@ -77,43 +80,4 @@ func (h *HydraConsentHandler) handleConsentGet(w http.ResponseWriter, r *http.Re
 	if err != nil {
 		fail(w, fmt.Errorf("cannot accept consent challenge %s", consentChallenge), 500)
 	}
-}
-
-func (h *HydraConsentHandler) acceptConsentAndRedirect(
-	w http.ResponseWriter,
-	r *http.Request,
-	consentRequest hydra.ConsentRequest,
-	consentChallenge string,
-	user domain.User,
-) error {
-	consentAccepted, err := h.hydraClient.AcceptConsentRequest(
-		consentChallenge,
-		user,
-		consentRequest.RequestedScope,
-		consentRequest.RequestedAccessTokenAudience,
-		true,
-	)
-
-	if err != nil {
-		return err
-	}
-
-	http.Redirect(w, r, consentAccepted.RedirectTo, 301)
-	return nil
-}
-
-func (h *HydraConsentHandler) rejectConsentAndRedirect(
-	w http.ResponseWriter,
-	r *http.Request,
-	consentChallenge string,
-	consentError error,
-) error {
-	consentRejected, err := h.hydraClient.RejectConsentRequest(consentChallenge, consentError)
-
-	if err != nil {
-		return err
-	}
-
-	http.Redirect(w, r, consentRejected.RedirectTo, 301)
-	return nil
 }

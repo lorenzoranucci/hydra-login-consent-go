@@ -51,16 +51,10 @@ func (h *HydraClientStruct) GetLoginRequest(loginChallenge string) (*LoginReques
 func (h *HydraClientStruct) AcceptLoginRequest(
 	loginChallenge string,
 	userID string,
-	remember *bool,
-	rememberFor *int64,
 ) (*LoginAccepted, error) {
 	body := &models.AcceptLoginRequest{
 		Subject: &userID,
-	}
-
-	if remember != nil && rememberFor != nil {
-		body.Remember = *remember
-		body.RememberFor = *rememberFor
+		Remember: true,
 	}
 
 	accept, err := (*h.getAdmin()).AcceptLoginRequest(
@@ -106,14 +100,10 @@ func (h *HydraClientStruct) AcceptLoginAndRedirect(
 	r *http.Request,
 	loginChallenge string,
 	userID string,
-	remember *bool,
-	rememberFor *int64,
 ) error {
 	loginAccepted, err := h.AcceptLoginRequest(
 		loginChallenge,
 		userID,
-		remember,
-		rememberFor,
 	)
 
 	if err != nil {

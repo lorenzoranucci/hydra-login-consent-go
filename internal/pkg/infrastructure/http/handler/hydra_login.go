@@ -64,8 +64,6 @@ func (h *HydraLoginHandler) handleLoginGet(w http.ResponseWriter, r *http.Reques
 			r,
 			loginChallenge,
 			loginRequest.LoginRequestSkipForUser.UserID,
-			nil,
-			nil,
 		)
 		if err != nil {
 			fail(w, fmt.Errorf("cannot accept login challenge"), 500)
@@ -105,9 +103,7 @@ func (h *HydraLoginHandler) handleLoginGet(w http.ResponseWriter, r *http.Reques
 			return
 		}
 
-		remember := true
-		var rememberFor int64 = 0
-		err = h.hydraClient.AcceptLoginAndRedirect(w, r, loginChallenge, user.Email, &remember, &rememberFor)
+		err = h.hydraClient.AcceptLoginAndRedirect(w, r, loginChallenge, user.Email())
 		if err != nil {
 			fail(w, fmt.Errorf("cannot accept login challenge"), 500)
 		}
@@ -179,8 +175,6 @@ func (h *HydraLoginHandler) handleLoginPost(w http.ResponseWriter, r *http.Reque
 			r,
 			loginChallenge,
 			loginRequest.LoginRequestSkipForUser.UserID,
-			nil,
-			nil,
 		)
 
 		if err != nil {
@@ -213,9 +207,7 @@ func (h *HydraLoginHandler) handleLoginPost(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	remember := true
-	var rememberFor int64 = 0
-	err = h.hydraClient.AcceptLoginAndRedirect(w, r, loginChallenge, user.Email, &remember, &rememberFor)
+	err = h.hydraClient.AcceptLoginAndRedirect(w, r, loginChallenge, user.Email())
 	if err != nil {
 		fail(w, fmt.Errorf("cannot accept login challenge"), 500)
 	}

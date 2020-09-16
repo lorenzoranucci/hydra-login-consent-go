@@ -5,8 +5,7 @@ import (
 )
 
 type SignInUserWithSocialLoginRequest struct {
-	SocialLoginProviderToken string
-	SocialLoginProvider      domain.SocialLoginProvider
+	SocialLoginProviderUser      *domain.SocialLoginProviderUser
 }
 
 type SignInUserWithSocialLoginServiceInterface interface {
@@ -26,46 +25,61 @@ func NewSignInUserWithSocialLoginService(userRepository domain.UserRepository) *
 func (s SignInWithSocialLoginService) Execute(
 	signInRequest SignInUserWithSocialLoginRequest,
 ) (*domain.User, error) {
-	socialLoginProviderUser, err := signInRequest.SocialLoginProvider.GetUserByToken(
-		signInRequest.SocialLoginProviderToken,
-	)
+	domainUserBySocialLoginProviderUserID, foundBySocialLoginProviderUserID, err := s.userRepository.
+		FindBySocialLoginProviderUser(
+			signInRequest.SocialLoginProviderUser,
+		)
 	if err != nil {
 		return nil, err
 	}
 
-	user, found, err := s.userRepository.FindBySocialLoginProviderUserID(
-		socialLoginProviderUser.ID,
-		signInRequest.SocialLoginProvider,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	if !found {
-		user, foundByEmail, err := s.userRepository.FindByEmail(
-			socialLoginProviderUser.Email,
+	if !foundBySocialLoginProviderUserID {
+		domainUserByEmail, foundByEmail, err := s.userRepository.FindByEmail(
+			signInRequest.SocialLoginProviderUser.Email(),
 		)
 		if err != nil {
 			return nil, err
 		}
 
 		if foundByEmail {
-			err = user.AddSocialLoginProviderUser(*socialLoginProviderUser, signInRequest.SocialLoginProvider)
-			if err != nil {
-				return nil, err
-			}
+			return s.addSocialLoginProviderUserToDomainUser(signInRequest, domainUserByEmail, signInRequest.SocialLoginProviderUser)
 		} else {
-			user = domain.CreateUserFromSocialLoginProviderUser(
-				*socialLoginProviderUser,
-				signInRequest.SocialLoginProvider,
-			)
-		}
-
-		err = s.userRepository.Persist(*user)
-		if err != nil {
-			return nil, err
+			return s.createANewUserFromSocialLoginProviderUser(signInRequest.SocialLoginProviderUser, err)
 		}
 	}
 
-	return user, nil
+	return domainUserBySocialLoginProviderUserID, nil
+}
+
+func (s SignInWithSocialLoginService) addSocialLoginProviderUserToDomainUser(signInRequest SignInUserWithSocialLoginRequest, domainUserByEmail *domain.User, socialLoginProviderUser *domain.SocialLoginProviderUser) (*domain.User, error) {
+	err := domainUserByEmail.AddSocialLoginProviderUser(signInRequest.SocialLoginProviderUser)
+	if err != nil {
+		return nil, err
+	}
+	err = s.userRepository.Persist(*domainUserByEmail)
+	if err != nil {
+		return nil, err
+	}
+
+	return domainUserByEmail, nil
+}
+
+func (s SignInWithSocialLoginService) createANewUserFromSocialLoginProviderUser(
+	socialLoginProviderUser *domain.SocialLoginProviderUser,
+	err error,
+) (*domain.User, error) {
+	newDomainUser, err := domain.CreateUserFromSocialLoginProviderUser(
+		socialLoginProviderUser,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.userRepository.Persist(*newDomainUser)
+	if err != nil {
+		return nil, err
+	}
+
+	return newDomainUser, nil
 }
