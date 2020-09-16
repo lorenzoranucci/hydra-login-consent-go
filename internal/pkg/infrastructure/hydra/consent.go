@@ -1,6 +1,8 @@
 package hydra
 
 import (
+	"net/http"
+
 	"github.com/lorenzoranucci/hydra-login-consent-go/internal/pkg/domain"
 	"github.com/ory/hydra-client-go/client/admin"
 	"github.com/ory/hydra-client-go/models"
@@ -24,7 +26,7 @@ func (h *HydraClientStruct) GetConsentRequest(consentChallenge string) (*Consent
 	getConsentRequestOk, err := (*h.getAdmin()).GetConsentRequest(
 		&admin.GetConsentRequestParams{
 			ConsentChallenge: consentChallenge,
-			Context:        h.getDefaultContext(),
+			Context:          h.getDefaultContext(),
 		})
 
 	if err != nil {
@@ -40,7 +42,30 @@ func (h *HydraClientStruct) GetConsentRequest(consentChallenge string) (*Consent
 	return consentRequest, nil
 }
 
-func (h *HydraClientStruct) AcceptConsentRequest(
+func (h *HydraClientStruct) AcceptConsentAndRedirect(
+	w http.ResponseWriter,
+	r *http.Request,
+	consentRequest ConsentRequest,
+	consentChallenge string,
+	user domain.User,
+) error {
+	consentAccepted, err := h.acceptConsentRequest(
+		consentChallenge,
+		user,
+		consentRequest.RequestedScope,
+		consentRequest.RequestedAccessTokenAudience,
+		true,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	http.Redirect(w, r, consentAccepted.RedirectTo, 301)
+	return nil
+}
+
+func (h *HydraClientStruct) acceptConsentRequest(
 	consentChallenge string,
 	user domain.User,
 	grantScopes []string,
@@ -53,7 +78,7 @@ func (h *HydraClientStruct) AcceptConsentRequest(
 				GrantAccessTokenAudience: grantAudience,
 				GrantScope:               grantScopes,
 				Remember:                 remember,
-				Session:                  &models.ConsentRequestSession{
+				Session: &models.ConsentRequestSession{
 					IDToken:     getIDTokenFromUser(user),
 					AccessToken: getAccessTokenFromUser(user),
 				},
@@ -71,7 +96,23 @@ func (h *HydraClientStruct) AcceptConsentRequest(
 	}, nil
 }
 
-func (h *HydraClientStruct) RejectConsentRequest(
+func (h *HydraClientStruct) RejectConsentAndRedirect(
+	w http.ResponseWriter,
+	r *http.Request,
+	consentChallenge string,
+	consentError error,
+) error {
+	consentRejected, err := h.rejectConsentRequest(consentChallenge, consentError)
+
+	if err != nil {
+		return err
+	}
+
+	http.Redirect(w, r, consentRejected.RedirectTo, 301)
+	return nil
+}
+
+func (h *HydraClientStruct) rejectConsentRequest(
 	consentChallenge string,
 	consentError error,
 ) (*ConsentRejected, error) {

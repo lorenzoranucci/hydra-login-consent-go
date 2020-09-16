@@ -1,9 +1,9 @@
 package social_login_provider
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 
@@ -12,7 +12,7 @@ import (
 
 type Facebook struct {
 	id           string
-	clientID     int
+	clientID     string
 	clientSecret     string
 	redirectURI  string
 	authEndpoint string // https://www.facebook.com/v8.0/dialog/oauth
@@ -22,7 +22,7 @@ type Facebook struct {
 
 func NewFacebook(
 	id string,
-	clientID int,
+	clientID string,
 	clientSecret string,
 	redirectURI string,
 	authEndpoint string,
@@ -40,32 +40,30 @@ func NewFacebook(
 	}
 }
 
-type FacebookAccessTokenResponse struct {
-	AccessToken string `json:"access_token"`
-}
-
 func (f *Facebook) GetID() string {
 	return f.id
 }
 
 func (f *Facebook) GetUserByToken(code string) (*domain.SocialLoginProviderUser, error) {
+	accessTokenGetURL := fmt.Sprintf(
+		"%s?client_id=%s&client_secret=%s&redirect_uri=%s&code=%s",
+		f.tokenEndpoint,
+		f.clientID,
+		f.clientSecret,
+		f.redirectURI,
+		code,
+	)
 	accessTokenResponseHTTP, err := http.Get(
-		fmt.Sprintf(
-			"%s?client_id=%d&client_secret=%s&redirect_uri=%s&code=%s",
-			f.tokenEndpoint,
-			f.clientID,
-			f.clientSecret,
-			f.redirectURI,
-			code,
-		),
+		accessTokenGetURL,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	scanner := bufio.NewScanner(accessTokenResponseHTTP.Body)
-	scanner.Scan()
-	accessTokenResponseBody :=scanner.Bytes()
+	accessTokenResponseBody, err := ioutil.ReadAll(accessTokenResponseHTTP.Body)
+	if err != nil {
+		return nil, err
+	}
 
 	accessTokenResponse := &FacebookAccessTokenResponse{}
 	err = json.Unmarshal(accessTokenResponseBody, accessTokenResponse)
@@ -73,39 +71,68 @@ func (f *Facebook) GetUserByToken(code string) (*domain.SocialLoginProviderUser,
 		return nil, err
 	}
 
+	if accessTokenResponse.AccessToken == nil {
+		return nil, fmt.Errorf("invalid access token")
+	}
+
+	tokenVerifyURL := fmt.Sprintf(
+		"%s?fields=id,email,first_name,last_name&access_token=%s",
+		f.verifyTokenEndpoint,
+		*accessTokenResponse.AccessToken,
+	)
 	facebookUserResponseHTTP, err := http.Get(
-		fmt.Sprintf(
-			"%s?fields=id,email,first_name,last_name&access_token=%s",
-			f.verifyTokenEndpoint,
-			accessTokenResponse.AccessToken,
-		),
+		tokenVerifyURL,
 	)
 
 	if err != nil {
 		return nil, err
 	}
 
-	scanner = bufio.NewScanner(facebookUserResponseHTTP.Body)
-	scanner.Scan()
-	facebookUserResponseBody :=scanner.Bytes()
+	facebookUserResponseBody, err := ioutil.ReadAll(facebookUserResponseHTTP.Body)
+	if err != nil {
+		return nil, err
+	}
 
-	facebookUser := &domain.SocialLoginProviderUser{}
+	facebookUser := &FacebookUser{}
 	err = json.Unmarshal(facebookUserResponseBody, facebookUser)
 	if err != nil {
 		return nil, err
 	}
 
-	return facebookUser, nil
+	socialLoginProviderUser, err := domain.NewSocialLoginProviderUser(
+		facebookUser.ID,
+		facebookUser.Email,
+		facebookUser.FirstName,
+		facebookUser.LastName,
+		f.id,
+		*accessTokenResponse.AccessToken,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return socialLoginProviderUser, nil
 }
 
-func (f *Facebook) GetLoginEndpoint(state string) (*url.URL, error) {
+func (f *Facebook) GetLoginEndpoint(loginChallenge string) (*url.URL, error) {
 	return url.Parse(
 		fmt.Sprintf(
-			"%s?client_id=%d&redirect_uri=%s&state=%s",
+			"%s?client_id=%s&redirect_uri=%s&state=%s&scope=email&auth_type=rerequest",
 			f.authEndpoint,
 			f.clientID,
 			f.redirectURI,
-			state,
+			loginChallenge,
 		),
 	)
+}
+
+type FacebookAccessTokenResponse struct {
+	AccessToken *string `json:"access_token,omitempty"`
+}
+
+type FacebookUser struct {
+	ID        string `json:"id"`
+	Email     string `json:"email"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
 }

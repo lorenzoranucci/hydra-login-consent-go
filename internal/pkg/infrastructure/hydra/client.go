@@ -23,8 +23,6 @@ type HydraClientInterface interface {
 		r *http.Request,
 		loginChallenge string,
 		userID string,
-		remember *bool,
-		rememberFor *int64,
 	) error
 
 	RejectLoginAndRedirect(
@@ -36,18 +34,20 @@ type HydraClientInterface interface {
 
 	GetConsentRequest(consentChallenge string) (*ConsentRequest, error)
 
-	AcceptConsentRequest(
+	AcceptConsentAndRedirect(
+		w http.ResponseWriter,
+		r *http.Request,
+		consentRequest ConsentRequest,
 		consentChallenge string,
 		user domain.User,
-		grantScopes []string,
-		grantAudience []string,
-		remember bool,
-	) (*ConsentAccepted, error)
+	) error
 
-	RejectConsentRequest(
+	RejectConsentAndRedirect(
+		w http.ResponseWriter,
+		r *http.Request,
 		consentChallenge string,
 		consentError error,
-	) (*ConsentRejected, error)
+	) error
 }
 
 type HydraClientStruct struct {

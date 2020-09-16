@@ -29,21 +29,21 @@ type User struct {
 
 func getIDTokenFromUser(user domain.User) IDToken {
 	return IDToken{
-		Name:  fmt.Sprintf("%s %s", user.FirstName, user.LastName),
-		Email: user.Email,
+		Name:  fmt.Sprintf("%s %s", user.FirstName(), user.LastName()),
+		Email: user.Email(),
 	}
 }
 
 func getAccessTokenFromUser(user domain.User) AccessToken {
 	return AccessToken{
 		Mercure: Mercure{
-			Subscribe: []string{fmt.Sprintf("users/%s", user.UUID.String())},
+			Subscribe: []string{fmt.Sprintf("users/%s", user.Uuid().String())},
 		},
 		User: User{
-			Email: user.Email,
-			Id:    user.ID,
-			Roles: user.Roles,
-			UUID:  user.UUID.String(),
+			Email: user.Email(),
+			Id:    user.Id(),
+			Roles: user.Roles(),
+			UUID:  user.Uuid().String(),
 		},
 	}
 }

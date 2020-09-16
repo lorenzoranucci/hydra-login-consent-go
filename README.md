@@ -50,7 +50,8 @@ docker run -d \
  Start Login and Consent app:
  
  ```sh
-go run ./...
+ eval $(make base-env)
+ go run cmd/main.go server
  ```
  
  Register an example client in Hydra and start it using Hydra demo utilities:

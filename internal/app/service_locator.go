@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"strconv"
 
 	"github.com/lorenzoranucci/hydra-login-consent-go/internal/pkg/application"
 	"github.com/lorenzoranucci/hydra-login-consent-go/internal/pkg/domain"
@@ -121,14 +120,9 @@ func (sl *ServiceLocator) CreateSocialLoginProviderFactory() social_login_provid
 
 func (sl *ServiceLocator) CreateFacebookSocialLoginProvider() *social_login_provider.Facebook {
 	if sl.facebookSocialLoginProvider == nil {
-		clientID, err := strconv.Atoi(os.Getenv("FACEBOOK_CLIENT_ID"))
-		if err != nil {
-			panic(err)
-		}
-
 		sl.facebookSocialLoginProvider = social_login_provider.NewFacebook(
 			sl.FacebookID(),
-			clientID,
+			os.Getenv("FACEBOOK_CLIENT_ID"),
 			os.Getenv("FACEBOOK_CLIENT_SECRET"),
 			os.Getenv("FACEBOOK_REDIRECT_URI"),
 			os.Getenv("FACEBOOK_AUTH_ENDPOINT"),
@@ -142,14 +136,9 @@ func (sl *ServiceLocator) CreateFacebookSocialLoginProvider() *social_login_prov
 
 func (sl *ServiceLocator) CreateGoogleSocialLoginProvider() *social_login_provider.Google {
 	if sl.googleSocialLoginProvider == nil {
-		clientID, err := strconv.Atoi(os.Getenv("GOOGLE_CLIENT_ID"))
-		if err != nil {
-			panic(err)
-		}
-
 		sl.googleSocialLoginProvider = social_login_provider.NewGoogle(
 			sl.GoogleID(),
-			clientID,
+			os.Getenv("GOOGLE_CLIENT_ID"),
 			os.Getenv("GOOGLE_CLIENT_SECRET"),
 			os.Getenv("GOOGLE_REDIRECT_URI"),
 			os.Getenv("GOOGLE_AUTH_ENDPOINT"),
